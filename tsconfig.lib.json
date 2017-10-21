@@ -1,3 +1,10 @@
 {
-    "extends": "./tsconfig.default.json"
+    "extends": "./tsconfig.default.json",
+    "exclude": [
+        "./test",
+        "./sample"
+    ],
+    "include": [
+        "./lib"
+    ]
 }

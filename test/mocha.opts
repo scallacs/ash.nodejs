@@ -1,6 +1,6 @@
 --timeout 15000
 --recursive lib
---recursive test
+--recursive test/testcase
 --require ts-node/register 
 --reporter spec 
 --require ./test/bootstrap.ts

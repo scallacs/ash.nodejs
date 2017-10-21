@@ -4,3 +4,4 @@ coverage
 *.log
 dist
 .nyc_output
+wiki

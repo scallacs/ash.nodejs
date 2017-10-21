@@ -1,7 +1,6 @@
 
 import { Ash } from "../ash";
-import { AlexaRequest } from "../alexa-request";
-import { AlexaResponse } from "../alexa-response";
+import { Alexa } from "../alexa/definitions";
 import { RequestAdapterInterface } from "./request-adapter-interface";
 
 /**
@@ -13,9 +12,9 @@ export class LambdaRequestAdapter implements RequestAdapterInterface{
 
     }
 
-    public handle(ash: Ash, request: AlexaRequest): any {
+    public handle(ash: Ash, request: Alexa.Request.Request): any {
         return ash.handle(request)
-            .then((response: AlexaResponse) => {
+            .then((response: Alexa.Response.Response) => {
                 this.context.callback(null, response);
             })
             .catch((error: any) => {

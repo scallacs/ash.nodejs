@@ -12,7 +12,7 @@
     "prepublish": "npm run build",
     "test": "mocha",
     "cover": "nyc npm test",
-    "build": "num run clean & tsc -p ./tsconfig.lib.json",
+    "build": "npm run clean && tsc -p ./tsconfig.lib.json",
     "lint": "tslint \"lib/**/*.ts\"",
     "clean": "rimraf .nyc_ouput coverage dist"
   },
@@ -36,15 +36,18 @@
   "devDependencies": {
     "@types/chai": "^4.0.1",
     "@types/mocha": "^2.2.41",
+    "aws-iot-device-sdk": "^2.1.0",
     "chai": "^4.1.0",
     "chai-as-promised": "^7.1.1",
+    "istanbul": "^0.4.5",
     "mocha": "^3.2.0",
+    "nyc": "^11.2.1",
     "rimraf": "^2.6.1",
+    "rpi-gpio": "^2.1.5",
+    "rxjs": "^6.5.3",
     "ts-node": "^3.3.0",
     "tslint": "^5.5.0",
-    "typescript": "^2.4.2",
-    "nyc": "^11.2.1",
-    "istanbul": "^0.4.5"
+    "typescript": "^2.4.2"
   },
   "dependencies": {
     "@types/node": "^8.0.46"

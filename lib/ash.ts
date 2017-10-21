@@ -1,28 +1,36 @@
 import { ControllerInterface } from "./controller-interface";
 import { EventEmitter } from 'events';
 import { AlexaResponseBuilder } from "./alexa-response-builder";
-import { AlexaResponse } from "./alexa-response";
-import { AlexaRequest } from "./alexa-request";
+import { Alexa } from "./alexa/definitions";
+import { DeviceRegistry } from "./definitions";
+import { InMemoryDeviceRegistry } from "./device-registry/in-memory-device-registry";
+
+type ControllerType = ControllerInterface | ((request: Alexa.Request.Request, response: AlexaResponseBuilder) => Promise<any>);
+
 
 export class Ash {
     _routes: {
-        filter: (request: AlexaRequest) => boolean,
+        filter: (request: Alexa.Request.Request) => boolean,
         action: ControllerInterface
     }[];
     _emitter: EventEmitter;
-    _devices: any[];
+    _logger: any;
 
-    constructor() {
-        this._devices = [];
+    public get deviceRegistry() {
+        return this._deviceRegistry;
+    };
+
+    constructor(private _deviceRegistry: DeviceRegistry = new InMemoryDeviceRegistry([])) {
         this._emitter = new EventEmitter();
         this._routes = [];
+        this._logger = console;
     }
 
-    isDeviceOnline(arg0: any, arg1: any): any {
-        return true;
-    }
 
-    // validateToken(request: AlexaRequest, userAccessToken: string): any {
+    public static createFromDeviceList(devices: Alexa.Device[]) {
+        return new Ash(new InMemoryDeviceRegistry(devices));
+    }
+    // validateToken(request: Alexa.Response.Response, userAccessToken: string): any {
     //     if (!userAccessToken || !this.isValidToken(userAccessToken)) {
     //         this.log('ERROR', `Discovery Request [${request.header.messageId}] failed. Invalid access token: ${userAccessToken}`);
     //         throw new Error('Invalid token');
@@ -33,8 +41,14 @@ export class Ash {
     log(...args: any[]) {
         console.log(...args);
     }
-    // Handle discovery
-    route(namespace: string | null, name: string | null, controllerOrFunction: ControllerInterface | ((request: AlexaRequest, response: AlexaResponseBuilder) => Promise<any>)) {
+
+    /**
+     * 
+     * @param namespace https://developer.amazon.com/docs/device-apis/alexa-interface.html
+     * @param name 
+     * @param controllerOrFunction 
+     */
+    interface(namespace: Alexa.Capability.NamespaceType | string, name: string, controllerOrFunction: ControllerType) {
         let controller: ControllerInterface;
         if (typeof controllerOrFunction === 'function') {
             controller = {
@@ -45,11 +59,33 @@ export class Ash {
             controller = controllerOrFunction;
         }
         this._routes.push({
-            filter: (request: AlexaRequest) => {
+            filter: (request: Alexa.Request.Request) => {
                 if (namespace !== null && request.directive.header.namespace !== namespace) {
                     return false;
                 }
                 if (name !== null && request.directive.header.name !== name) {
+                    return false;
+                }
+                return true;
+            },
+            action: controller
+        });
+        return this;
+    }
+
+    namespace(namespace: Alexa.Capability.NamespaceType | string, controllerOrFunction: ControllerType) {
+        let controller: ControllerInterface;
+        if (typeof controllerOrFunction === 'function') {
+            controller = {
+                handle: controllerOrFunction
+            };
+        }
+        else {
+            controller = controllerOrFunction;
+        }
+        this._routes.push({
+            filter: (request: Alexa.Request.Request) => {
+                if (namespace !== null && request.directive.header.namespace !== namespace) {
                     return false;
                 }
                 return true;
@@ -71,124 +107,112 @@ export class Ash {
         return this;
     }
 
-    isValidToken(token: string): any {
-        return true;
-    }
 
-    getDevices() {
-        return this._devices;
-    }
+    // onDiscovery(request: Alexa.Request.Request): Promise<Alexa.Response.Response> {
+    //     /**
+    //      * This function is invoked when we receive a "Discovery" message from Alexa Smart Home Skill.
+    //      * We are expected to respond back with a list of appliances that we have discovered for a given customer.
+    //      *
+    //      * @param {Object} request - The full request object from the Alexa smart home service. This represents a DiscoverAppliancesRequest.
+    //      *     https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#discoverappliancesrequest
+    //      *
+    //      * @param {function} callback - The callback object on which to succeed or fail the response.
+    //      *     https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-handler.html#nodejs-prog-model-handler-callback
+    //      *     If successful, return <DiscoverAppliancesResponse>.
+    //      *     https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#discoverappliancesresponse
+    //      */
+    //     this.log('DEBUG', `Discovery Request: ${JSON.stringify(request)}`);
 
-    registerDevices(devices: any[]) {
-        this._devices = devices;
-        return this;
-    }
+    //     let directive = request.directive;
+    //     /**
+    //      * Get the OAuth token from the request.
+    //      */
 
-    onDiscovery(request: AlexaRequest): Promise<AlexaResponse> {
-        /**
-         * This function is invoked when we receive a "Discovery" message from Alexa Smart Home Skill.
-         * We are expected to respond back with a list of appliances that we have discovered for a given customer.
-         *
-         * @param {Object} request - The full request object from the Alexa smart home service. This represents a DiscoverAppliancesRequest.
-         *     https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#discoverappliancesrequest
-         *
-         * @param {function} callback - The callback object on which to succeed or fail the response.
-         *     https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-handler.html#nodejs-prog-model-handler-callback
-         *     If successful, return <DiscoverAppliancesResponse>.
-         *     https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#discoverappliancesresponse
-         */
-        this.log('DEBUG', `Discovery Request: ${JSON.stringify(request)}`);
+    //     /**
+    //      * Generic stub for validating the token against your cloud service.
+    //      * Replace isValidToken() function with your own validation.
+    //      * 
+    //      * TODO add helper for access control token
+    //      */
+    //     // const userAccessToken = directive.payload && directive.payload.accessToken ? directive.payload.accessToken.trim() : null;
+    //     // if (!userAccessToken || !this.isValidToken(userAccessToken)) {
+    //     //     const errorMessage = `Discovery Request [${directive.header.messageId}] failed. Invalid access token: ${userAccessToken}`;
+    //     //     this.log('ERROR', errorMessage);
+    //     //     this.terminate(directive, new Error(errorMessage));
+    //     //     return;
+    //     // }
 
-        let directive = request.directive;
-        /**
-         * Get the OAuth token from the request.
-         */
+    //     /**
+    //      * Assume access token is valid at this point.
+    //      * Retrieve list of devices from cloud based on token.
+    //      *
+    //      * For more information on a discovery response see
+    //      *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#discoverappliancesresponse
+    //      */
+    //     let responseBuilder = new AlexaResponseBuilder(request);
+    //     responseBuilder.setDiscoveryDevices(this.getDevices());
+    //     const response = responseBuilder.build();
 
-        /**
-         * Generic stub for validating the token against your cloud service.
-         * Replace isValidToken() function with your own validation.
-         * 
-         * TODO add helper for access control token
-         */
-        // const userAccessToken = directive.payload && directive.payload.accessToken ? directive.payload.accessToken.trim() : null;
-        // if (!userAccessToken || !this.isValidToken(userAccessToken)) {
-        //     const errorMessage = `Discovery Request [${directive.header.messageId}] failed. Invalid access token: ${userAccessToken}`;
-        //     this.log('ERROR', errorMessage);
-        //     this.terminate(directive, new Error(errorMessage));
-        //     return;
-        // }
+    //     /**
+    //      * Log the response. These messages will be stored in CloudWatch.
+    //      */
+    //     this.log('DEBUG', `Discovery Response: ${JSON.stringify(response)}`);
 
-        /**
-         * Assume access token is valid at this point.
-         * Retrieve list of devices from cloud based on token.
-         *
-         * For more information on a discovery response see
-         *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#discoverappliancesresponse
-         */
-        let responseBuilder = new AlexaResponseBuilder(request);
-        responseBuilder.setDiscoveryDevices(this.getDevices());
-        const response = responseBuilder.build();
+    //     /**
+    //      * Return result with successful message.
+    //      */
+    //     this._emitter.emit('response', response);
+    //     return Promise.resolve(response);
+    // }
 
-        /**
-         * Log the response. These messages will be stored in CloudWatch.
-         */
-        this.log('DEBUG', `Discovery Response: ${JSON.stringify(response)}`);
+    /**
+     * Get the access token.
+     */
+    // const userAccessToken = request.payload.accessToken.trim();
 
-        /**
-         * Return result with successful message.
-         */
-        this._emitter.emit('response', response);
-        return Promise.resolve(response);
-    }
+    /**
+     * Generic stub for validating the token against your cloud service.
+     * Replace isValidToken() function with your own validation.
+     *
+     * If the token is invliad, return InvalidAccessTokenError
+     *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#invalidaccesstokenerror
+     */
+    // this.validateToken(request, userAccessToken);
 
-    onControl(request: AlexaRequest): Promise<AlexaResponse> {
+    /**
+     * Grab the endpointId from the request.
+     */
+    // const endpointId = directive.endpoint.endpointId;
+
+    // /**
+    //  * If the endpointId is missing, return UnexpectedInformationReceivedError
+    //  *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#unexpectedinformationreceivederror
+    //  */
+    // if (!endpointId) {
+    //     this.log('ERROR', 'No endpointId provided in directive');
+    //     const payload = { faultingParameter: `endpointId: ${endpointId}` };
+    //     throw new Error('NoApplianceId');
+    // }
+
+    /**
+     * At this point the endpointId and accessToken are present in the directive.
+     *
+     * Please review the full list of errors in the link below for different states that can be reported.
+     * If these apply to your device/cloud infrastructure, please add the checks and respond with
+     * accurate error messages. This will give the user the best experience and help diagnose issues with
+     * their devices, accounts, and environment
+     *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#error-messages
+     */
+    // if (!this.isDeviceOnline(endpointId, userAccessToken)) {
+    //     this.log('ERROR', `Device offline: ${endpointId}`);
+    //     this.terminate(request, 'TargetOffline');
+    //     return;
+    // }
+
+    onControl(request: Alexa.Request.Request): Promise<Alexa.Response.Response> {
         this.log('DEBUG', `Control Request: ${JSON.stringify(request)}`);
 
         let directive = request.directive;
-        /**
-         * Get the access token.
-         */
-        // const userAccessToken = request.payload.accessToken.trim();
-
-        /**
-         * Generic stub for validating the token against your cloud service.
-         * Replace isValidToken() function with your own validation.
-         *
-         * If the token is invliad, return InvalidAccessTokenError
-         *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#invalidaccesstokenerror
-         */
-        // this.validateToken(request, userAccessToken);
-
-        /**
-         * Grab the endpointId from the request.
-         */
-        // const endpointId = directive.endpoint.endpointId;
-
-        // /**
-        //  * If the endpointId is missing, return UnexpectedInformationReceivedError
-        //  *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#unexpectedinformationreceivederror
-        //  */
-        // if (!endpointId) {
-        //     this.log('ERROR', 'No endpointId provided in directive');
-        //     const payload = { faultingParameter: `endpointId: ${endpointId}` };
-        //     throw new Error('NoApplianceId');
-        // }
-
-        /**
-         * At this point the endpointId and accessToken are present in the directive.
-         *
-         * Please review the full list of errors in the link below for different states that can be reported.
-         * If these apply to your device/cloud infrastructure, please add the checks and respond with
-         * accurate error messages. This will give the user the best experience and help diagnose issues with
-         * their devices, accounts, and environment
-         *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#error-messages
-         */
-        // if (!this.isDeviceOnline(endpointId, userAccessToken)) {
-        //     this.log('ERROR', `Device offline: ${endpointId}`);
-        //     this.terminate(request, 'TargetOffline');
-        //     return;
-        // }
-
         let promises = [];
 
         let responseBuilder = new AlexaResponseBuilder(directive);
@@ -196,7 +220,8 @@ export class Ash {
         for (let route of this._routes) {
             if (route.filter(request)) {
                 this.log('Matching route: ', route);
-                promises.push(route.action.handle(request, responseBuilder));
+                let handler = route.action.handle(request, responseBuilder, this);
+                promises.push(handler);
             }
         }
         this.log('Found ' + promises.length + ' route for this action');
@@ -209,72 +234,38 @@ export class Ash {
             });
     }
 
-    // onQuery(request: AlexaRequest): any {
-    //     throw new Error("Method not implemented.");
-    // }
+    handle(request: Alexa.Request.Request): Promise<Alexa.Response.Response> {
+        try {
+            // TODO validate request (with json validator)
+            if (!request.directive) {
+                throw new Error('Missing key "directive" in request"');
+            }
+            let directive = request.directive;
+            if (!directive.header) {
+                throw new Error('Missing key "header" in request"');
+            }
+            let header = directive.header;
 
-    // onUnsupportedNamespace(request: AlexaRequest): any {
-    //     const errorMessage = `No supported namespace: ${request.directive.header.namespace}`;
-    //     this.log('ERROR', errorMessage);
-    //     this.terminate(request, new Error(errorMessage));
-    // }
+            let payloadVersion = header.payloadVersion;
 
-    handle(request: AlexaRequest): Promise<AlexaResponse> {
-        if (!request.directive) {
-            throw new Error('Missing key "directive" in request"');
+            if (payloadVersion !== '3') {
+                throw new Error('Unsupported payload version: ' + payloadVersion);
+            }
+            console.log('Request: ', request);
+            return this.onControl(request)
+                .catch((err: any) => {
+                    return this.errorHandler(request, err);
+                });
         }
-        let directive = request.directive;
-        if (!directive.header) {
-            throw new Error('Missing key "header" in request"');
+        catch (err) {
+            return this.errorHandler(request, err);
         }
-        let header = directive.header;
+    }
 
-        let payloadVersion = header.payloadVersion;
-
-        if (payloadVersion !== '3') {
-            throw new Error('Unsupported payload version: ' + payloadVersion);
-        }
-
-        // V3
-        console.log('Request: ', request);
-        switch (directive.header.namespace) {
-            /**
-             * The namespace of 'Alexa.ConnectedHome.Discovery' indicates a directive is being made to the Lambda for
-             * discovering all appliances associated with the customer's appliance cloud account.
-             *
-             * For more information on device discovery, please see
-             *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#discovery-messages
-             */
-            case 'Alexa.ConnectedHome.Discovery':
-            case 'Alexa.Discovery':
-                return this.onDiscovery(request);
-            default:
-                return this.onControl(request);
-            // /**
-            //  * The namespace of "Alexa.ConnectedHome.Control" indicates a request is being made to control devices such as
-            //  * a dimmable or non-dimmable bulb. The full list of Control events sent to your lambda are described below.
-            //  *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#payload
-            //  */
-            // case 'Alexa.ConnectedHome.Control':
-            //     return this.onControl(request);
-
-            // /**
-            //  * The namespace of "Alexa.ConnectedHome.Query" indicates a request is being made to query devices about
-            //  * information like temperature or lock state. The full list of Query events sent to your lambda are described below.
-            //  *  https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/docs/smart-home-skill-api-reference#payload
-            //  *
-            //  * TODO: In this sample, query handling is not implemented. Implement it to retrieve temperature or lock state.
-            //  */
-            // case 'Alexa.ConnectedHome.Query':
-            //     return this.onQuery(request);
-
-            // /**
-            //  * Received an unexpected message
-            //  */
-            // default: {
-            //     return this.onUnsupportedNamespace(request);
-            // }
-        }
+    errorHandler(request: Alexa.Request.Request, err: any) {
+        let response = new AlexaResponseBuilder(request.directive)
+            .error(Alexa.Response.ErrorTypes.INTERNAL_ERROR, err.toString());
+        return Promise.resolve(response.build());
     }
 
 

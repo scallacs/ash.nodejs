@@ -1,12 +1,22 @@
+# NOT READY YET 
+
 # Ash: Alexa SmartHome Backend Builder
 
 [![NPM Version][npm-image]][npm-url] [![Build Status][travis-image]][travis-url] [![Coverage][coveralls-image]][coveralls-url]
 
-Build a backend for Alexa Smarthome API with nodejs.
+## What is ASH (**A**lexa **S**mart**H**ome Backend Builder)
 
-## Feature
+It's a backend builder for Alexa Smarthome API with nodejs.
 
-## Developement
+## Get Started
+
+Read the [wiki](https://github.com/scallacs/ash.nodejs/wiki)
+
+## See the demo
+
+TODO
+
+## Contribute
 
 ### Build
 
@@ -17,7 +27,7 @@ Build a backend for Alexa Smarthome API with nodejs.
 - `npm run test` - Tests
 - `npm run cover` - Tests with coverage
 
-## Commands
+### Commands
 
 All commands in [package.json](./package.json)
 

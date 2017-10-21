@@ -1,8 +1,9 @@
 import { AlexaResponseBuilder } from "./alexa-response-builder";
-import { AlexaRequest } from "./alexa-request";
+import { Alexa } from "./alexa/definitions";
+import { Ash } from "./ash";
 
-export interface ControllerInterface {
+export interface ControllerInterface<T = any> {
     
-    handle(request: AlexaRequest, responseBuilder: AlexaResponseBuilder): Promise<any>;
+    handle(request: Alexa.Request.Request, responseBuilder: AlexaResponseBuilder, ash: Ash): Promise<T>;
     
 }
